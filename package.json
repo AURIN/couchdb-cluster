@@ -16,10 +16,12 @@
     "grunt-contrib-clean": "^0.7.0",
     "grunt-contrib-copy": "^0.8.1",
     "grunt-dock": "git+https://github.com/lmoran/grunt-dock.git#master",
-    "grunt-clouddity": "git+https://github.com/lmoran/grunt-clouddity.git#v0.7.0",
+    "grunt-clouddity": "git+https://github.com/lmoran/grunt-clouddity.git#v0.8.0",
     "grunt-http": "2.0.1",
     "grunt-wait": "0.1.0",
     "grunt-run": "^0.5.2",
-    "load-grunt-tasks" : "~3.3.0"
+    "load-grunt-tasks": "~3.3.0",
+    "grunt-cli": "~1.2.0",
+    "ejs": "^2.5.6"
   }
 }

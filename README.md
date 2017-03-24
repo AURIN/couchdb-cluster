@@ -5,7 +5,7 @@ Scripts for build and deployment of a CouchDB 2.0 Cluster
 
 ## Overview
 
-The cluster has 3 instances and a load balancer.
+The cluster has 3 CouchDB instances and a load balancer.
 
 
 ## Configuration of sensitive data
@@ -92,7 +92,7 @@ There are 2 different images to build
   (add this line to the `/etc/default/docker` file: 
   `DOCKER_OPTS="-H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock" --insecure-registry cuttlefish.eresearch.unimelb.edu.au --insecure-registry docker.eresearch.unimelb.edu.au`
   and restart the Docker daemon (`sudo systemctl daemon-reload`)
-* Install openapi-infra: `npm install`
+* Install the project: `npm install`
 
 NOTE: On Ubuntu 15.04 and Docker 1.8.2, set this line:
 `ExecStart=/usr/bin/docker daemon -H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock` 
@@ -106,15 +106,55 @@ If the cluster name is not set with the `cluster` CLI option, the default `ccdev
 
 * Build of images: `grunt build --cluster <cluster name>`
 * Pushing of images to the registry: `grunt push --cluster <cluster name>`
-* Provisioning of VMs, setup of security, copy of configuration to VMs: `grunt launch --cluster <cluster name>`
-* Configuration (some containers need re-start): 
-`grunt configure --cluster <cluster name> `
+* Provisioning of VMs, setup of security groups: `grunt launch --cluster <cluster name>`
+* Docker containers deployments: `grunt pull create`
 
+
+* Configuration (some containers need re-start): `grunt configure --cluster <cluster name> `
+```
+  grunt adddefaultdb --ip ccdev-1-couchdbc --no-color
+  grunt adddefaultdb --ip ccdev-2-couchdbc --no-color
+  grunt adddefaultdb --ip ccdev-3-couchdbc --no-color
+```
+
+```
+  grunt listnodes --hosts-format
+  
+  Copy the hostnames and ips to /etc/hosts to simplify following steps
+  
+  grunt addcouchdbnode --masterip ccdev-1-couchdbc --slaveip 115.146.94.30 --no-color
+  grunt addcouchdbnode --masterip ccdev-1-couchdbc --slaveip 115.146.94.29 --no-color
+```
 
 ## Cluster test 
 
+FIXME: it hangs
 `grunt test --cluster <cluster name>`
 
+
+## Replication setup
+
+```
+curl -XPOST "http://ccdev-1-couchdbc:5984/_replicator" \
+  --user "admin:Zoo8aikaixeishee"\
+  --header "Content-Type:application/json"\
+  -vvv\
+  --data @- << EOF
+   {
+   "_id": "geoclassification-development", 
+    "source": "http://admin:aurin@db-dev.aurin.org.au:5984/geoclassification-development",
+    "target": "geoclassification-development",
+    "create_target": false,
+    "continuous": true
+   }
+EOF
+```
+
+curl -XGET "http://ccdev-1-couchdbc:5984/_replicator/_all_docs"\
+  --user "admin:Zoo8aikaixeishee"
+
+curl -XDELETE "http://ccdev-1-couchdbc:5984/_replicator/geoclassification-development?rev=2-a660aadfa08e6cb497fa6c76dcbd4ad0"\
+  --user "admin:Zoo8aikaixeishee"
 
 ## Cluster management
 

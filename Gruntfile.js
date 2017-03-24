@@ -52,9 +52,14 @@ module.exports = function(grunt) {
                   run : {
                     create : {
                       HostConfig : {
-                        Binds : [ "/home/ubuntu/:/hostvolume" ],
                         NetworkMode : "host"
-                      }
+                      },
+                      Env : [
+                          "NODENAME=<%= clouddityRuntime.node.node.address%>",
+                          "COUCHDB_USER="
+                              + grunt.sensitiveConfig.couchdb.auth.username,
+                          "COUCHDB_PASSWORD="
+                              + grunt.sensitiveConfig.couchdb.auth.password ]
                     },
                     start : {},
                     cmd : []
@@ -76,19 +81,20 @@ module.exports = function(grunt) {
             replication : 3,
             imageRef : "73c6f8d8-f885-4253-8bee-e45da068fb65",
             flavorRef : "885227de-b7ee-42af-a209-2f1ff59bc330",
-            securitygroups : [ "defaultsg", "loadbalancersg" ],
-            copytohost : [ {
-              from : "./target/nodetypes/loadbalancer/",
-              to : "/home/ubuntu"
-            } ],
+            securitygroups : [ "defaultsg", "couchdbsg" ],
             images : [ "couchdbc" ],
             test : [ {
-              name : "Cluster nodes",
-              auth : grunt.sensitiveConfig.kibana.auth,
+              name : "Cluster node",
               protocol : "http",
-              port : 80,
-              path : "/kibana/app/kibana",
-              shouldContain : "kibana"
+              port : 5984,
+              path : "/",
+              shouldContain : "Welcome"
+            }, {
+              name : "N. of docs in test database",
+              protocol : "http",
+              port : 5984,
+              path : "/test/_all_docs",
+              shouldContain : "rows:3,"
             } ]
           } ],
 
@@ -149,17 +155,145 @@ module.exports = function(grunt) {
           }
         },
 
-        // Configures the cluster
+        // Add a node to the cluster
         http : {
-          configureurl : {
+          addusersdb : {
             options : {
-              url : "http://" + (grunt.option("cluster") || "oadev")
-                  + "-1-loadbalancer/reg/dataregistry/url",
+              url : "http://" + grunt.option("ip") + ":5984/_users",
               method : "put",
-              auth : grunt.sensitiveConfig.test.auth,
-              body : grunt.customConfig[(grunt.option("cluster") || "oadev")].dataregistryurl
+              headers : {
+                "Content-Type" : "application/json"
+              },
+              body : "{}",
+              auth : grunt.sensitiveConfig.couchdb.auth
+            }
+          },
+          addchangesdb : {
+            options : {
+              url : "http://" + grunt.option("ip") + ":5984/_global_changes",
+              method : "put",
+              headers : {
+                "Content-Type" : "application/json"
+              },
+              body : "{}",
+              auth : grunt.sensitiveConfig.couchdb.auth
+            }
+          },
+          addmetadatadb : {
+            options : {
+              url : "http://" + grunt.option("ip") + ":5984/_metadata",
+              method : "put",
+              headers : {
+                "Content-Type" : "application/json"
+              },
+              body : "{}",
+              auth : grunt.sensitiveConfig.couchdb.auth
+            }
+          },
+          addreplicatordb : {
+            options : {
+              url : "http://" + grunt.option("ip") + ":5984/_replicator",
+              method : "put",
+              headers : {
+                "Content-Type" : "application/json"
+              },
+              body : "{}",
+              auth : grunt.sensitiveConfig.couchdb.auth
+            }
+          },
+          addcouchdbnode : {
+            options : {
+              url : "http://" + grunt.option("masterip")
+                  + ":5986/_nodes/couchdb@" + grunt.option("slaveip"),
+              method : "put",
+              headers : {
+                "Content-Type" : "application/json"
+              },
+              body : "{}",
+              auth : grunt.sensitiveConfig.couchdb.auth
+            }
+          },
+          createtestdb : {
+            options : {
+              url : "http://" + (grunt.option("cluster") || "ccdev")
+                  + "-1-couchdbc:5984/test",
+              method : "put",
+              headers : {
+                "Content-Type" : "application/json"
+              },
+              body : "{}",
+              auth : grunt.sensitiveConfig.couchdb.auth
+            }
+          },
+          removetestdb : {
+            options : {
+              url : "http://" + (grunt.option("cluster") || "ccdev")
+                  + "-1-couchdbc:5984/test",
+              method : "delete",
+              headers : {
+                "Content-Type" : "application/json"
+              },
+              body : "{}",
+              auth : grunt.sensitiveConfig.couchdb.auth
+            }
+          },
+          adddoc1 : {
+            options : {
+              url : "http://" + (grunt.option("cluster") || "ccdev")
+                  + "-1-couchdbc:5984/test",
+              method : "post",
+              headers : {
+                "Content-Type" : "application/json"
+              },
+              body : JSON.stringify({
+                name : "jock"
+              }),
+              auth : grunt.sensitiveConfig.couchdb.auth
+            }
+          },
+          adddoc2 : {
+            options : {
+              url : "http://" + (grunt.option("cluster") || "ccdev")
+                  + "-2-couchdbc:5984/test",
+              method : "post",
+              headers : {
+                "Content-Type" : "application/json"
+              },
+              body : JSON.stringify({
+                name : "tom"
+              }),
+              auth : grunt.sensitiveConfig.couchdb.auth
+            }
+          },
+          adddoc3 : {
+            options : {
+              url : "http://" + (grunt.option("cluster") || "ccdev")
+                  + "-3-couchdbc:5984/test",
+              method : "post",
+              headers : {
+                "Content-Type" : "application/json"
+              },
+              body : JSON.stringify({
+                name : "jean"
+              }),
+              auth : grunt.sensitiveConfig.couchdb.auth
             }
           }
+        /*
+         * curl -XPUT "http://${node1ip}:5984/test" --header
+         * "Content-Type:application/json"\ --user "admin:${pwd}" curl -XPOST
+         * "http://${node2ip}:5984/test" --header
+         * "Content-Type:application/json"\ --data '{"name":"jock"}' curl -XPOST
+         * "http://${node3ip}:5984/test" --header
+         * "Content-Type:application/json"\ --data '{"name":"tom"}'
+         * 
+         * curl -XGET "http://${node1ip}:5984/test/_all_docs" --header
+         * "Content-Type:application/json" \ --user "admin:${pwd}" curl -XGET
+         * "http://${node2ip}:5984/test/_all_docs" --header
+         * "Content-Type:application/json" \ --user "admin:${pwd}" curl -XGET
+         * "http://${node3ip}:5984/test/_all_docs" --header
+         * "Content-Type:application/json" \ --user "admin:${pwd}"
+         */
         }
       });
 
@@ -186,8 +320,7 @@ module.exports = function(grunt) {
   grunt.registerTask("pull", [ "clouddity:pull" ]);
 
   // Configure the CouchDB cluster once the cluster is launched
-  grunt.registerTask("configure", [ "http:configureurl", "http:geoserveruser",
-      "http:geoserverpassword", "http:schedule", "restart" ]);
+  grunt.registerTask("addcouchdbnode", [ "http:addcouchdbnode" ]);
 
   // Listing cluster components tasks
   grunt.registerTask("listsecuritygroups", [ "clouddity:listsecuritygroups" ]);
@@ -206,6 +339,11 @@ module.exports = function(grunt) {
   grunt
       .registerTask("remove", [ "clouddity:stop", "wait", "clouddity:remove" ]);
 
+  // Add default databases to CouchDB instances
+  grunt.registerTask("adddefaultdb", [ "http:addusersdb", "http:addmetadatadb",
+      "http:addchangesdb", "http:addreplicatordb" ]);
+
   // Tests the deployed containers
-  grunt.registerTask("test", [ "clouddity:test" ]);
+  grunt.registerTask("test", [ "http:createtestdb", "http:adddoc1",
+      "http:adddoc2", "http:adddoc3", "clouddity:test", "http:removetestdb" ]);
 };
