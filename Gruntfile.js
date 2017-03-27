@@ -52,6 +52,7 @@ module.exports = function(grunt) {
                   run : {
                     create : {
                       HostConfig : {
+                        Binds : [ "/mnt:/hostvolume" ],
                         NetworkMode : "host"
                       },
                       Env : [
@@ -80,7 +81,7 @@ module.exports = function(grunt) {
             name : "couchdbc",
             replication : 3,
             imageRef : "73c6f8d8-f885-4253-8bee-e45da068fb65",
-            flavorRef : "885227de-b7ee-42af-a209-2f1ff59bc330",
+            flavorRef : "1",
             securitygroups : [ "defaultsg", "couchdbsg" ],
             images : [ "couchdbc" ],
             test : [ {
@@ -94,7 +95,7 @@ module.exports = function(grunt) {
               protocol : "http",
               port : 5984,
               path : "/test/_all_docs",
-              shouldContain : "rows:3,"
+              shouldContain : ":3,"
             } ]
           } ],
 
@@ -279,21 +280,6 @@ module.exports = function(grunt) {
               auth : grunt.sensitiveConfig.couchdb.auth
             }
           }
-        /*
-         * curl -XPUT "http://${node1ip}:5984/test" --header
-         * "Content-Type:application/json"\ --user "admin:${pwd}" curl -XPOST
-         * "http://${node2ip}:5984/test" --header
-         * "Content-Type:application/json"\ --data '{"name":"jock"}' curl -XPOST
-         * "http://${node3ip}:5984/test" --header
-         * "Content-Type:application/json"\ --data '{"name":"tom"}'
-         * 
-         * curl -XGET "http://${node1ip}:5984/test/_all_docs" --header
-         * "Content-Type:application/json" \ --user "admin:${pwd}" curl -XGET
-         * "http://${node2ip}:5984/test/_all_docs" --header
-         * "Content-Type:application/json" \ --user "admin:${pwd}" curl -XGET
-         * "http://${node3ip}:5984/test/_all_docs" --header
-         * "Content-Type:application/json" \ --user "admin:${pwd}"
-         */
         }
       });
 

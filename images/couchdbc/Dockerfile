@@ -100,7 +100,7 @@ COPY ./docker-entrypoint.sh /
 
 # Setup directories and permissions
 RUN chmod +x /docker-entrypoint.sh \
- && mkdir /opt/couchdb/data /opt/couchdb/etc/default.d /var/log/couchdb\
+ && mkdir /opt/couchdb/etc/default.d /var/log/couchdb\
  && chown -R couchdb:couchdb /opt/couchdb/ /var/log/couchdb
 
 WORKDIR /opt/couchdb

@@ -59,10 +59,16 @@ this schema:
     },
   "couchdb" : {
     "auth" : {
-      "username" : "admin",
+      "username" : "<couchdb admin user>",
       "password" : "<couchdb admin password>"
     }
-  }
+  },
+   "replication" : {
+    "url" : "<target couchdb url without the protocol>",
+    "auth" : {
+      "username" : "<target couchdb admin user>",
+      "password" : "<target couchdb admin password>"
+    }
   }
 }
 ```
@@ -104,57 +110,148 @@ con `sudo systemctl daemon-reload; sudo service docker restart`
 
 If the cluster name is not set with the `cluster` CLI option, the default `ccdev` is used. The number of computing nodes can be set by adding the `computing-replication` parameter to the grunt commands. 
 
-* Build of images: `grunt build --cluster <cluster name>`
+* Build of images: `grunt build --cluster <cluster name>` 
 * Pushing of images to the registry: `grunt push --cluster <cluster name>`
 * Provisioning of VMs, setup of security groups: `grunt launch --cluster <cluster name>`
 * Docker containers deployments: `grunt pull create`
 
 
-* Configuration (some containers need re-start): `grunt configure --cluster <cluster name> `
-```
-  grunt adddefaultdb --ip ccdev-1-couchdbc --no-color
-  grunt adddefaultdb --ip ccdev-2-couchdbc --no-color
-  grunt adddefaultdb --ip ccdev-3-couchdbc --no-color
-```
+* Configuration (some containers need re-start)
 
 ```
   grunt listnodes --hosts-format
-  
-  Copy the hostnames and ips to /etc/hosts to simplify following steps
-  
-  grunt addcouchdbnode --masterip ccdev-1-couchdbc --slaveip 115.146.94.30 --no-color
-  grunt addcouchdbnode --masterip ccdev-1-couchdbc --slaveip 115.146.94.29 --no-color
 ```
+
+  Copy the hostnames and ips to /etc/hosts to simplify following steps
+
+To build the CouchDB cluster, standard databases have to be created, and nodes have to be added one by one (the following example work for cluster named "ccdev", with three nodes.
+The first node is considered the "master", while the other nodes have to be added, with their IP addresses.
+```
+  grunt start
+  grunt adddefaultdb --ip ccdev-1-couchdbc --no-color
+  grunt adddefaultdb --ip ccdev-2-couchdbc --no-color
+  grunt adddefaultdb --ip ccdev-3-couchdbc --no-color
+  grunt addcouchdbnode --masterip ccdev-1-couchdbc --slaveip 115.146.94.250  --no-color
+  grunt addcouchdbnode --masterip ccdev-1-couchdbc --slaveip 115.146.94.25 --no-color
+```
+
 
 ## Cluster test 
 
 FIXME: it hangs
-`grunt test --cluster <cluster name>`
+```
+  export username=`jq --raw-output '.couchdb.auth.username' sensitive.json`
+  export password=`jq --raw-output '.couchdb.auth.password' sensitive.json`
+  export susername=`jq --raw-output '.replication.auth.username' sensitive.json`
+  export spassword=`jq --raw-output '.replication.auth.password' sensitive.json`
+  export url="ccdev-1-couchdbc:5984"
+  export surl=`jq --raw-output '.replication.url' sensitive.json`
+  echo ${username}:${password}@${url} ${susername}:${spassword}@${surl}
+
+  curl -XGET "http://${url}/_membership" --user "${username}:${password}"
+  grunt test 
+```  
 
 
 ## Replication setup
 
+The AURIN databases are first created, then replication is set.
+
 ```
-curl -XPOST "http://ccdev-1-couchdbc:5984/_replicator" \
-  --user "admin:Zoo8aikaixeishee"\
+  curl -XPUT "http://${url}/geoclassification-development"\
+    --user "${username}:${password}"
+  curl -XPUT "http://${url}/dataregistry-development"\
+    --user "${username}:${password}"
+  curl -XPUT "http://${url}/datastore-development"\
+    --user "${username}:${password}"
+  curl -XPUT "http://${url}/myaurin-development"\
+    --user "${username}:${password}"
+  curl -XPUT "http://${url}/workflow-development"\
+    --user "${username}:${password}"
+  curl -XPUT "http://${url}/workflow-test-db"\
+    --user "${username}:${password}"
+
+curl -XPOST "http://${url}/_replicate" \
+  --user "${username}:${password}"\
   --header "Content-Type:application/json"\
   -vvv\
   --data @- << EOF
    {
-   "_id": "geoclassification-development", 
-    "source": "http://admin:aurin@db-dev.aurin.org.au:5984/geoclassification-development",
-    "target": "geoclassification-development",
+    "source": "http://${susername}:${spassword}@${surl}/geoclassification-development",
+    "target": "http://${username}:${password}@${url}/geoclassification-development",
+    "create_target": false,
+    "continuous": true
+   }
+EOF
+sleep 10
+curl -XPOST "http://${url}/_replicate" \
+  --user "${username}:${password}"\
+  --header "Content-Type:application/json"\
+  -vvv\
+  --data @- << EOF
+   {
+    "source": "http://${susername}:${spassword}@${surl}/dataregistry-development",
+    "target": "http://${username}:${password}@${url}/dataregistry-development",
+    "create_target": false,
+    "continuous": true
+   }
+EOF
+sleep 10
+curl -XPOST "http://${url}/_replicate" \
+  --user "${username}:${password}"\
+  --header "Content-Type:application/json"\
+  -vvv\
+  --data @- << EOF
+   {
+    "source": "http://${susername}:${spassword}@${surl}/myaurin-development",
+    "target": "http://${username}:${password}@${url}/myaurin-development",
+    "create_target": false,
+    "continuous": true
+   }
+EOF
+sleep 10
+curl -XPOST "http://${url}/_replicate" \
+  --user "${username}:${password}"\
+  --header "Content-Type:application/json"\
+  -vvv\
+  --data @- << EOF
+   {
+    "source": "http://${susername}:${spassword}@${surl}/workflow-development",
+    "target": "http://${username}:${password}@${url}/workflow-development",
+    "create_target": false,
+    "continuous": true
+   }
+EOF
+sleep 10
+curl -XPOST "http://${url}/_replicate" \
+  --user "${username}:${password}"\
+  --header "Content-Type:application/json"\
+  -vvv\
+  --data @- << EOF
+   {
+    "source": "http://${susername}:${spassword}@${surl}/workflow-test-db",
+    "target": "http://${username}:${password}@${url}/workflow-test-db",
+    "create_target": false,
+    "continuous": true
+   }
+EOF
+sleep 10
+curl -XPOST "http://${url}/_replicate" \
+  --user "${username}:${password}"\
+  --header "Content-Type:application/json"\
+  -vvv\
+  --data @- << EOF
+   {
+    "source": "http://${susername}:${spassword}@${surl}/datastore-development",
+    "target": "http://${username}:${password}@${url}/datastore-development",
     "create_target": false,
     "continuous": true
    }
 EOF
 ```
 
-curl -XGET "http://ccdev-1-couchdbc:5984/_replicator/_all_docs"\
-  --user "admin:Zoo8aikaixeishee"
+Replicaton can be cancelled directly from the Faxuton admin GUI on one of the cluster nodes.
 
-curl -XDELETE "http://ccdev-1-couchdbc:5984/_replicator/geoclassification-development?rev=2-a660aadfa08e6cb497fa6c76dcbd4ad0"\
-  --user "admin:Zoo8aikaixeishee"
 
 ## Cluster management
 
